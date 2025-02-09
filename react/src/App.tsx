@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type {
   User,
   ChannelSort,
@@ -19,55 +20,83 @@ import 'stream-chat-react/dist/css/v2/index.css';
 import MyChannelHeader from './MyChannelHeader';
 import MyAIStateIndicator from './MyAIStateIndicator';
 
-// your Stream app information
-const apiKey = process.env.STREAM_API_KEY;
-const userToken = process.env.STREAM_TOKEN;
-const userId = 'anakin_skywalker';
-const userName = 'Anakin Skywalker';
+function App() {
+  // User information
+  const userId = 'anakin_skywalker';
+  const userName = 'Anakin Skywalker';
 
-if (!apiKey || !userToken) {
-  throw new Error('Missing API key or user token');
-}
+  // State for Stream credentials and user
+  const [apiKey, setApiKey] = useState<string>('');
+  const [userToken, setUserToken] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
 
-const user: User = {
-  id: userId,
-  name: userName,
-  image:
-    'https://vignette.wikia.nocookie.net/starwars/images/6/6f/Anakin_Skywalker_RotS.png',
-};
+  // Define user data
+  const user: User = {
+    id: userId,
+    name: userName,
+    image: 'https://getstream.io/random_svg/?name=' + userName,
+  };
 
-const sort: ChannelSort = { last_message_at: -1 };
-const filters: ChannelFilters = {
-  type: 'messaging',
-  members: { $in: [userId] },
-};
-const options: ChannelOptions = {
-  limit: 10,
-};
-
-const App = () => {
-  const client = useCreateChatClient({
+  // Initialize chat client with empty credentials first
+  const chatClient = useCreateChatClient({
     apiKey,
     tokenOrProvider: userToken,
     userData: user,
   });
 
-  if (!client) return <div>Setting up client & connection...</div>;
+  // Fetch token from backend
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: userId }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch token');
+        
+        const data = await response.json();
+        setApiKey(data.api_key);
+        setUserToken(data.token);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching token:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    fetchToken();
+  }, [userId]);
+
+  if (isLoading || !chatClient) {
+    return <div>Loading chat...</div>;
+  }
+
+  const filters: ChannelFilters = {
+    type: 'messaging',
+    members: { $in: [userId] },
+  };
+
+  const sort: ChannelSort = { last_message_at: -1 };
+  const options: ChannelOptions = { state: true, presence: true, limit: 10 };
 
   return (
-    <Chat client={client}>
+    <Chat client={chatClient}>
       <ChannelList filters={filters} sort={sort} options={options} />
       <Channel>
         <Window>
           <MyChannelHeader />
           <MessageList />
-          <MyAIStateIndicator />
           <MessageInput />
         </Window>
         <Thread />
+        <MyAIStateIndicator />
       </Channel>
     </Chat>
   );
-};
+}
 
 export default App;

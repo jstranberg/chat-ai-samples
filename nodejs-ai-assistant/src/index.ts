@@ -36,6 +36,29 @@ app.get('/', (req, res) => {
 });
 
 /**
+ * Generate a user token for Stream Chat
+ */
+app.post('/token', (req, res) => {
+  const { user_id } = req.body;
+  
+  if (!user_id) {
+    res.status(400).json({ error: 'Missing user_id in request body' });
+    return;
+  }
+
+  try {
+    const token = serverClient.createToken(user_id);
+    res.json({ 
+      token,
+      api_key: apiKey,
+      user_id 
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to generate token' });
+  }
+});
+
+/**
  * Handle the request to start the AI Agent
  */
 app.post('/start-ai-agent', async (req, res) => {
